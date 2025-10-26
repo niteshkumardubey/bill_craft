@@ -350,8 +350,8 @@ def interactive():
             if choice == '1': # Add product
                 sku = input('SKU: ').strip()
                 name = input('Name: ').strip()
-                price = input('Price: ').strip()
-                cost = input('Cost (optional): ').strip() or None
+                price = input('Selling Price: ').strip()
+                cost = input('Cost Price (optional): ').strip() or None
                 reorder = input('Reorder level (int, default 0): ').strip() or '0'
                 pid = db.add_product(sku, name, price, cost, int(reorder))
                 print('Added product id', pid)
