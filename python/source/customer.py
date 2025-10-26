@@ -31,5 +31,5 @@ class Customer:
     
     # List of customers
     def list_customers(self):
-        cur = self.conn.execute('SELECT * FROM customers')
+        cur = self.db.conn.execute('SELECT * FROM customers')
         return cur.fetchall()
