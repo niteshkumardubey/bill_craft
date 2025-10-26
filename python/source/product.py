@@ -10,8 +10,10 @@ class Product:
         price = to_decimal(price)
         cost = to_decimal(cost) if cost else None
         cur = self.db.conn.cursor()
-        cur.execute('INSERT INTO products (sku,name,price,cost,reorder_level) VALUES (?,?,?,?,?)',
-                    (sku, name, str(price), str(cost) if cost else None, reorder_level))
+        cur.execute(
+            'INSERT INTO products (sku,name,price,cost,reorder_level) VALUES (?,?,?,?,?)',
+            (sku, name, str(price), str(cost) if cost else None, reorder_level)
+        )
         self.db.conn.commit()
         return cur.lastrowid
     
@@ -30,22 +32,30 @@ class Product:
             return False
         params.append(product_id)
         sql = f"UPDATE products SET {', '.join(updates)} WHERE id=?"
-        self.conn.execute(sql, params)
-        self.conn.commit()
+        self.db.conn.execute(sql, params)
+        self.db.conn.commit()
         return True
     
     # Search product by product ID
     def get_product(self, product_id):
-        cur = self.conn.execute('SELECT * FROM products WHERE id=?', (product_id,))
+        cur = self.db.conn.execute('SELECT * FROM products WHERE id=?', (product_id,))
         return cur.fetchone()
     
     # Search product by SKU and name
     def find_product_by_sku_or_name(self, term):
-        cur = self.conn.execute("SELECT * FROM products WHERE sku LIKE ? OR name LIKE ?",
-                                (f"%{term}%", f"%{term}%"))
+        cur = self.db.conn.execute(
+            "SELECT * FROM products WHERE sku LIKE ? OR name LIKE ?",
+            (f"%{term}%", f"%{term}%")
+        )
         return cur.fetchall()
     
     # List of all products
     def list_products(self):
-        cur = self.conn.execute('SELECT p.*, IFNULL((SELECT SUM(change) FROM inventory_movements im WHERE im.product_id=p.id),0) as stock FROM products p')
+        cur = self.db.conn.execute('''
+            SELECT p.*, 
+                   IFNULL((SELECT SUM(change) 
+                           FROM inventory_movements im 
+                           WHERE im.product_id=p.id),0) as stock
+            FROM products p
+        ''')
         return cur.fetchall()

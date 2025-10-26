@@ -23,7 +23,7 @@ class Inventory:
     
     # List of low stocks
     def low_stock_report(self):
-        cur = self.conn.execute('''
+        cur = self.db.conn.execute('''
             SELECT p.*, IFNULL((SELECT SUM(change) FROM inventory_movements im WHERE im.product_id=p.id),0) as stock
             FROM products p WHERE IFNULL((SELECT SUM(change) FROM inventory_movements im WHERE im.product_id=p.id),0) <= p.reorder_level
         ''')
