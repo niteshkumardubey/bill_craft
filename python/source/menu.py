@@ -121,7 +121,7 @@ def interactive():
                 iid = int(input('Invoice id: '))
                 out = input('Output CSV filename: ').strip() or f"invoice_{iid}.csv"
                 try:
-                    path = invoice.export_sales_report_excel(iid, out)
+                    path = invoice.export_single_invoice_csv(iid, out)
                     print('Exported to', path)
                 except Exception as e:
                     print('Error:', e)

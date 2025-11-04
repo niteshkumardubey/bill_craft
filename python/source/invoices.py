@@ -92,47 +92,58 @@ class InvoiceManager:
         cur = self.db.conn.execute(sql, params)
         return cur.fetchall()
 
-    # Excel Export
-    def export_sales_report_excel(self, filename="sales_report.xlsx", start_date=None, end_date=None):
-        """Export sales report (summary + all invoices) to Excel"""
-        sales = SalesManager(self.db)
-        rows = self.list_invoices(start_date, end_date)
-        summary = sales.sales_summary(start_date, end_date)
+    # CSV Export
+    def export_single_invoice_csv(self, invoice_id, filename=None):
+        """Export a single invoice with its items + customer details to CSV"""
+        inv, items = self.get_invoice(invoice_id)
+        if not inv:
+            raise ValueError("Invoice not found")
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Sales Report"
+        # Fetch customer details
+        from customer import Customer
+        cust_obj = Customer(self.db)
+        cust = cust_obj.get_customer(inv["customer_id"])
+        print("#### DP1")
+        if not filename:
+            filename = f"invoice_{invoice_id}.csv"
+        print("#### DP2")
+        with open(filename, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
 
-        headers = ["Invoice No", "Date", "Customer ID", "Subtotal", "Tax", "Total"]
-        ws.append(headers)
+            # ====== Header Section ======
+            writer.writerow(["Invoice Export"])
+            writer.writerow([])
 
-        for r in rows:
-            ws.append([
-                r['invoice_no'],
-                r['date'],
-                r['customer_id'],
-                float(r['subtotal']),
-                float(r['tax']),
-                float(r['total'])
-            ])
+            # Customer details section
+            writer.writerow(["Customer Details"])
+            writer.writerow(["Customer ID", "Name", "Email", "Phone", "Address"])
+            if cust:
+                writer.writerow([
+                    cust["id"],
+                    cust["name"],
+                    cust.get("email", ""),
+                    cust.get("phone", ""),
+                    cust.get("address", "")
+                ])
+            else:
+                writer.writerow(["N/A", "N/A", "N/A", "N/A", "N/A"])
+            writer.writerow([])
 
-        ws.append([])
-        ws.append(["", "", "Total Invoices", summary['count']])
-        ws.append(["", "", "Total Sales", float(summary['total_sales'])])
+            # Invoice summary
+            writer.writerow(["Invoice Info"])
+            writer.writerow(["Invoice No", "Date", "Subtotal", "Tax", "Total"])
+            writer.writerow([inv["invoice_no"], inv["date"], inv["subtotal"], inv["tax"], inv["total"]])
+            writer.writerow([])
 
-        # Auto column width
-        for col in ws.columns:
-            max_length = 0
-            column = col[0].column_letter
-            for cell in col:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            ws.column_dimensions[column].width = max_length + 2
-
-        wb.save(filename)
+            # Line Items
+            writer.writerow(["Line Items"])
+            writer.writerow(["Description", "Qty", "Unit Price", "Line Total"])
+            for it in items:
+                writer.writerow([it["description"], it["qty"], it["unit_price"], it["line_total"]])
+        print("#### DP3")
         return filename
 
-    # CSV Export
+
     def export_sales_report_csv(self, filename="sales_report.csv", start_date=None, end_date=None):
         """Export sales report (summary + all invoices) to CSV"""
         sales = SalesManager(self.db)
