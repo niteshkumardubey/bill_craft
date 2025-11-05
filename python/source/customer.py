@@ -29,6 +29,11 @@ class Customer:
         self.conn.commit()
         return True
     
+    # Get single customer details
+    def get_customer(self, customer_id):
+        cur = self.db.conn.execute('SELECT * FROM customers WHERE id=?', (customer_id))
+        return cur.fetchone() 
+    
     # List of customers
     def list_customers(self):
         cur = self.db.conn.execute('SELECT * FROM customers')
