@@ -103,10 +103,17 @@ class InvoiceManager:
         from customer import Customer
         cust_obj = Customer(self.db)
         cust = cust_obj.get_customer(inv["customer_id"])
-        print("#### DP1")
+
+        # Convert sqlite3.Row to dict if not None
+        if cust:
+            cust = dict(cust)
+
+        # File name handling
         if not filename:
             filename = f"invoice_{invoice_id}.csv"
-        print("#### DP2")
+        elif not filename.lower().endswith(".csv"):
+            filename += ".csv"
+
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
@@ -119,8 +126,8 @@ class InvoiceManager:
             writer.writerow(["Customer ID", "Name", "Email", "Phone", "Address"])
             if cust:
                 writer.writerow([
-                    cust["id"],
-                    cust["name"],
+                    cust.get("id", ""),
+                    cust.get("name", ""),
                     cust.get("email", ""),
                     cust.get("phone", ""),
                     cust.get("address", "")
@@ -140,7 +147,7 @@ class InvoiceManager:
             writer.writerow(["Description", "Qty", "Unit Price", "Line Total"])
             for it in items:
                 writer.writerow([it["description"], it["qty"], it["unit_price"], it["line_total"]])
-        print("#### DP3")
+
         return filename
 
 
