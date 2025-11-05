@@ -1,10 +1,26 @@
 # ----------------------------- invoices.py -----------------------------
-import csv, openpyxl
+import os
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from database import Database, to_decimal
 from inventory import Inventory
 from sales import SalesManager
+from customer import Customer
+
+# -------------- For CSV files ---------------------
+import csv, openpyxl
+
+# -------------- For pdf files ---------------------
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph,
+    Spacer, Image
+)
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
 
 
 class InvoiceManager:
@@ -100,7 +116,6 @@ class InvoiceManager:
             raise ValueError("Invoice not found")
 
         # Fetch customer details
-        from customer import Customer
         cust_obj = Customer(self.db)
         cust = cust_obj.get_customer(inv["customer_id"])
 
@@ -150,6 +165,111 @@ class InvoiceManager:
 
         return filename
 
+    def export_single_invoice_pdf(self, invoice_id, filename=None):
+        """Export a single invoice (with customer details & items) to PDF"""
+
+        # ---------- FONT ----------
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        font_path = os.path.abspath(os.path.join(base_dir, "..", "Fonts", "dejavu-fonts-ttf-2.37", "ttf", "DejaVuSans.ttf"))
+        pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
+        addMapping("DejaVuSans", 0, 0, "DejaVuSans")
+
+        # ---------- FETCH DATA ----------
+        inv, items = self.get_invoice(invoice_id)
+        if not inv:
+            raise ValueError("Invoice not found")
+        
+        cust_obj = Customer(self.db)
+        cust = cust_obj.get_customer(inv["customer_id"])
+        if cust:
+            cust = dict(cust)
+
+        # ---------- OUTPUT PATH ----------
+        if not filename:
+            filename = f"invoice_{invoice_id}.pdf"
+        elif not filename.lower().endswith(".pdf"):
+            filename += ".pdf"
+
+        # ---------- SETUP PDF ----------
+        doc = SimpleDocTemplate(filename, pagesize=A4)
+        styles = getSampleStyleSheet()
+        for s in styles.byName.values():
+            s.fontName = "DejaVuSans"
+        elements = []
+
+        # ---------- COMPANY LOGO ----------
+        logo_path = os.path.join(base_dir, "..", "Assets", "logo.png")
+        if os.path.exists(logo_path):
+            img = Image(logo_path, width=100, height=100)
+            elements.append(img)
+        else:
+            elements.append(Paragraph("<b>N K Enterprises</b>", styles["Title"]))
+        elements.append(Spacer(1, 12))
+
+        # ---------- HEADER ----------
+        elements.append(Paragraph("<b>Tax Invoice</b>", styles["Title"]))
+        elements.append(Spacer(1, 10))
+
+        # ---------- CUSTOMER DETAILS ----------
+        elements.append(Paragraph("<b>Customer Details:</b>", styles["Heading3"]))
+        if cust:
+            cust_text = f"""
+            <b>Name:</b> {cust.get('name', '')}<br/>
+            <b>Email:</b> {cust.get('email', '')}<br/>
+            <b>Phone:</b> {cust.get('phone', '')}<br/>
+            <b>Address:</b> {cust.get('address', '')}
+            """
+        else:
+            cust_text = "N/A"
+        elements.append(Paragraph(cust_text, styles["Normal"]))
+        elements.append(Spacer(1, 12))
+
+        # ---------- INVOICE SUMMARY ----------
+        inv_info = f"""
+        <b>Invoice No:</b> {inv['invoice_no']}<br/>
+        <b>Date:</b> {inv['date']}<br/>
+        <b>Subtotal:</b> ₹{inv['subtotal']}<br/>
+        <b>Tax:</b> ₹{inv['tax']}<br/>
+        <b>Total:</b> ₹{inv['total']}
+        """
+        elements.append(Paragraph("<b>Invoice Summary:</b>", styles["Heading3"]))
+        elements.append(Paragraph(inv_info, styles["Normal"]))
+        elements.append(Spacer(1, 12))
+
+        # ---------- LINE ITEMS TABLE ----------
+        data = [["Description", "Qty", "Unit Price", "Line Total"]]
+        for it in items:
+            data.append([
+                it["description"],
+                str(it["qty"]),
+                str(it["unit_price"]),
+                str(it["line_total"]),
+            ])
+        table = Table(data, colWidths=[200, 60, 80, 80])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.black),
+            ("FONTNAME", (0, 0), (-1, 0), "DejaVuSans"),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ]))
+        elements.append(Paragraph("<b>Invoice Items:</b>", styles["Heading3"]))
+        elements.append(table)
+        elements.append(Spacer(1, 25))
+
+        # ---------- SIGNATURE SECTION ----------
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph("<b>For N K Enterprises</b>", styles["Normal"]))
+        elements.append(Spacer(1, 30))
+        elements.append(Paragraph("__________________________", styles["Normal"]))
+        elements.append(Paragraph("<b>Authorized Signature</b>", styles["Normal"]))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("<b>Thank you for your business!</b>", styles["Normal"]))
+
+        # ---------- BUILD PDF ----------
+        doc.build(elements)
+        return filename
 
     def export_sales_report_csv(self, filename="sales_report.csv", start_date=None, end_date=None):
         """Export sales report (summary + all invoices) to CSV"""
