@@ -18,6 +18,7 @@ Main Menu
 8) Export invoice CSV
 9) Low stock report
 10) Sales summary
+11) Export invoice PDF
 0) Exit
 Choose: '''
 
@@ -136,6 +137,15 @@ def interactive():
                 e = input('End date (YYYY-MM-DD) or blank: ').strip() or None
                 summary = sales.sales_summary(start_date=s, end_date=e)
                 print('Invoices:', summary['count'], 'Total sales:', summary['total_sales'])
+
+            elif choice == '11':  # Export invoice PDF
+                iid = int(input('Invoice id: '))
+                out = input('Output PDF filename: ').strip() or f"invoice_{iid}.pdf"
+                try:
+                    path = invoice.export_single_invoice_pdf(iid, out)
+                    print('Exported PDF to', path)
+                except Exception as e:
+                    print('Error:', e)
 
             elif choice == '0':  # Exit
                 print("Goodbye!")
