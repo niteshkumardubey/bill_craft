@@ -22,6 +22,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.fonts import addMapping
 
+# ----------------- Paths --------------------
+from paths import BASE_DIR, FONT_PATH, DATABASE_PATH, INVOICE_PATH
 
 class InvoiceManager:
     def __init__(self, db: Database):
@@ -129,6 +131,8 @@ class InvoiceManager:
         elif not filename.lower().endswith(".csv"):
             filename += ".csv"
 
+        filename = os.path.join(INVOICE_PATH, filename)
+        
         with open(filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
@@ -169,9 +173,10 @@ class InvoiceManager:
         """Export a single invoice (with customer details & items) to PDF"""
 
         # ---------- FONT ----------
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        font_path = os.path.abspath(os.path.join(base_dir, "..", "Fonts", "dejavu-fonts-ttf-2.37", "ttf", "DejaVuSans.ttf"))
-        pdfmetrics.registerFont(TTFont("DejaVuSans", font_path))
+        if not FONT_PATH:
+            raise ValueError("Font not found")
+        
+        pdfmetrics.registerFont(TTFont("DejaVuSans", FONT_PATH))
         addMapping("DejaVuSans", 0, 0, "DejaVuSans")
 
         # ---------- FETCH DATA ----------
@@ -185,10 +190,16 @@ class InvoiceManager:
             cust = dict(cust)
 
         # ---------- OUTPUT PATH ----------
+        if not os.path.exists(INVOICE_PATH):
+            print(f"Creating directory: {INVOICE_PATH}")
+            os.makedirs(INVOICE_PATH, exist_ok=True)
+        
         if not filename:
             filename = f"invoice_{invoice_id}.pdf"
         elif not filename.lower().endswith(".pdf"):
             filename += ".pdf"
+
+        filename = os.path.join(INVOICE_PATH, filename)
 
         # ---------- SETUP PDF ----------
         doc = SimpleDocTemplate(filename, pagesize=A4)
@@ -198,7 +209,7 @@ class InvoiceManager:
         elements = []
 
         # ---------- COMPANY LOGO ----------
-        logo_path = os.path.join(base_dir, "..", "Assets", "logo.png")
+        logo_path = os.path.join(BASE_DIR, "..", "Assets", "logo.png")
         if os.path.exists(logo_path):
             img = Image(logo_path, width=100, height=100)
             elements.append(img)
@@ -269,6 +280,10 @@ class InvoiceManager:
 
         # ---------- BUILD PDF ----------
         doc.build(elements)
+
+        # ---------- Prepare the full path ------------
+        filename = os.path.join(INVOICE_PATH, filename)
+
         return filename
 
     def export_sales_report_csv(self, filename="sales_report.csv", start_date=None, end_date=None):
